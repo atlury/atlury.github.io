@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Showroom with Car</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        #ui {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+        .ui-button {
+            padding: 10px 20px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .ui-button:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+        #color-picker {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid white;
+            transition: transform 0.2s;
+        }
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+<div id="color-picker"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+    let scene, camera, renderer, controls, car, mixer, doorAction, isDoorOpen = false;
+    let carMaterials = [];
+
+    function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);
+
+        createShowroom();
+        createLighting();
+
+        camera.position.set(5, 3, 5);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 3;
+        controls.maxDistance = 10;
+        controls.maxPolarAngle = Math.PI / 2;
+
+        loadCar('scene.gltf'); // Update this with your car model path
+
+        createColorPicker();
+        animate();
+    }
+
+    function createShowroom() {
+        const concreteTexture = new THREE.TextureLoader().load('concrete_texture.jpg'); // Update this with your concrete texture path
+
+        // Floor
+        const floorGeometry = new THREE.PlaneGeometry(20, 20);
+        const floorMaterial = new THREE.MeshStandardMaterial({
+            map: concreteTexture,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Walls
+        const wallGeometry = new THREE.PlaneGeometry(20, 10);
+        const wallMaterial = new THREE.MeshStandardMaterial({
+            map: concreteTexture,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+
+        const backWall = new THREE.Mesh(wallGeometry, wallMaterial);
+        backWall.position.z = -10;
+        backWall.position.y = 5;
+        scene.add(backWall);
+
+        const leftWall = new THREE.Mesh(wallGeometry, wallMaterial);
+        leftWall.position.x = -10;
+        leftWall.position.y = 5;
+        leftWall.rotation.y = Math.PI / 2;
+        scene.add(leftWall);
+
+        const rightWall = new THREE.Mesh(wallGeometry, wallMaterial);
+        rightWall.position.x = 10;
+        rightWall.position.y = 5;
+        rightWall.rotation.y = -Math.PI / 2;
+        scene.add(rightWall);
+
+        // Ceiling
+        const ceilingGeometry = new THREE.PlaneGeometry(20, 20);
+        const ceilingMaterial = new THREE.MeshStandardMaterial({
+            map: concreteTexture,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
+        ceiling.position.y = 10;
+        ceiling.rotation.x = Math.PI / 2;
+        scene.add(ceiling);
+    }
+
+    function createLighting() {
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const spotLight1 = new THREE.SpotLight(0xffffff, 0.8);
+        spotLight1.position.set(-5, 9, -5);
+        spotLight1.angle = Math.PI / 6;
+        spotLight1.penumbra = 0.2;
+        spotLight1.decay = 2;
+        spotLight1.distance = 50;
+        spotLight1.castShadow = true;
+        spotLight1.shadow.mapSize.width = 1024;
+        spotLight1.shadow.mapSize.height = 1024;
+        scene.add(spotLight1);
+
+        const spotLight2 = new THREE.SpotLight(0xffffff, 0.8);
+        spotLight2.position.set(5, 9, -5);
+        spotLight2.angle = Math.PI / 6;
+        spotLight2.penumbra = 0.2;
+        spotLight2.decay = 2;
+        spotLight2.distance = 50;
+        spotLight2.castShadow = true;
+        spotLight2.shadow.mapSize.width = 1024;
+        spotLight2.shadow.mapSize.height = 1024;
+        scene.add(spotLight2);
+    }
+
+    function loadCar(modelPath) {
+        const loader = new THREE.GLTFLoader();
+        loader.load(
+            modelPath,
+            function (gltf) {
+                car = gltf.scene;
+                car.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        carMaterials.push(child.material);
+                    }
+                });
+                scene.add(car);
+                car.position.set(0, 0, 0);
+
+                mixer = new THREE.AnimationMixer(car);
+                const doorClip = THREE.AnimationClip.findByName(gltf.animations, 'DoorAction');
+                doorAction = mixer.clipAction(doorClip);
+            },
+            undefined,
+            function (error) {
+                console.error('An error happened', error);
+            }
+        );
+    }
+
+    function createColorPicker() {
+        const colors = [
+            { name: 'NEXA Blue', hex: '#364C9F' },
+            { name: 'Solid Fire Red', hex: '#FF0000' },
+            { name: 'Magma Grey', hex: '#4B4B4B' },
+            { name: 'Silky Silver', hex: '#C0C0C0' },
+            { name: 'Pearl Arctic White', hex: '#FFFFFF' },
+            { name: 'Pearl Metallic Lucent Orange', hex: '#FF4500' },
+            { name: 'Midnight Blue', hex: '#191970' },
+            { name: 'Turquoise Blue', hex: '#00CED1' }
+        ];
+
+        const colorPicker = document.getElementById('color-picker');
+        colors.forEach(color => {
+            const colorOption = document.createElement('div');
+            colorOption.className = 'color-option';
+            colorOption.style.backgroundColor = color.hex;
+            colorOption.addEventListener('click', () => changeCarColor(color.hex));
+            colorPicker.appendChild(colorOption);
+        });
+    }
+
+    function changeCarColor(color) {
+        carMaterials.forEach(material => {
+            material.color.set(color);
+            material.needsUpdate = true;
+        });
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        if (mixer) mixer.update(0.01);
+        if (car) car.rotation.y += 0.005; // Rotate the car slowly
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    init();
+</script>
+</body>
+</html>
