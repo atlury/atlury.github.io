@@ -1,6 +1,6 @@
 import OnnxWrapper from './Silero.js';
 
-const modelPath = "silero_vad.onnx";  // Update this path if necessary
+const modelPath = "https://atlury.github.io/digitalhuman/silero_vad.onnx";  // Update this path if necessary
 
 export class VadDetector {
     constructor(startThreshold, endThreshold, samplingRate, minSilenceDurationMs, speechPadMs) {
