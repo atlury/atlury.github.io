@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Activity Detection Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }}
+        #status {{
+            font-weight: bold;
+            margin-bottom: 10px;
+        }}
+        #audioList {{
+            margin-top: 20px;
+        }}
+    </style>
+</head>
+<body>
+    <h1>Voice Activity Detection Demo</h1>
+    <div id="status">Not listening</div>
+    <button id="startButton">Start Listening</button>
+    <button id="stopButton" disabled>Stop Listening</button>
+    <div id="audioList"></div>
+
+    <script type="module">
+        {speech_chunks_js}
+        {microphone_audio_js}
+        {silero_js}
+        {voice_activity_detector_js}
+
+        const status = document.getElementById('status');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const audioList = document.getElementById('audioList');
+
+        let speechChunks;
+
+        startButton.addEventListener('click', async () => {{
+            speechChunks = new SpeechChunks(
+                () => {{
+                    console.log("Speech start");
+                    status.textContent = "Listening...";
+                }},
+                (blob) => {{
+                    console.log("Speech end");
+                    status.textContent = "Not listening";
+                    const audio = new Audio(URL.createObjectURL(blob));
+                    const listItem = document.createElement('div');
+                    listItem.appendChild(audio);
+                    const playButton = document.createElement('button');
+                    playButton.textContent = 'Play';
+                    playButton.onclick = () => audio.play();
+                    listItem.appendChild(playButton);
+                    audioList.appendChild(listItem);
+                }}
+            );
+
+            try {{
+                await speechChunks.start();
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                status.textContent = "Listening...";
+            }} catch (error) {{
+                console.error("Failed to start VAD:", error);
+                status.textContent = "Error starting VAD";
+            }}
+        }});
+
+        stopButton.addEventListener('click', () => {{
+            if (speechChunks) {{
+                speechChunks.stop();
+                startButton.disabled = false;
+                stopButton.disabled = true;
+                status.textContent = "Not listening";
+            }}
+        }});
+    </script>
+</body>
+</html>
