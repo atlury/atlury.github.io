@@ -1,30 +1,22 @@
-import * as ort from 'onnxruntime-web';
+import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/esm/ort.min.js';
 
 class OnnxWrapper {
-    private session: ort.InferenceSession;
-    private _state: number[][];
-    private _context: number[];
-    private _last_sr: number;
-    private _last_batch_size: number;
-    private sample_rates: number[];
-    private sessionReady: Promise<void>;
-
-    constructor(path: string, force_onnx_cpu: boolean = true) {
+    constructor(path, force_onnx_cpu = true) {
         console.log(`Initializing OnnxWrapper with path: ${path}`);
         this.sessionReady = this.initSession(path, force_onnx_cpu);
         this.resetStates();
         this.sample_rates = [8000, 16000];
     }
 
-    async ready(): Promise<void> {
+    async ready() {
         console.log('Waiting for OnnxWrapper session to be ready');
         await this.sessionReady;
         console.log('OnnxWrapper session is ready');
     }
 
-    private async initSession(path: string, force_onnx_cpu: boolean) {
+    async initSession(path, force_onnx_cpu) {
         console.log(`Initializing ONNX session with force_onnx_cpu: ${force_onnx_cpu}`);
-        const options: ort.InferenceSession.SessionOptions = {
+        const options = {
             executionProviders: force_onnx_cpu ? ['wasm'] : ['webgl', 'wasm'],
             graphOptimizationLevel: 'all',
             executionMode: 'sequential',
@@ -42,9 +34,9 @@ class OnnxWrapper {
         console.log('ONNX session created successfully');
     }
 
-    private _validate_input(x: number[][], sr: number): [number[][], number] {
+    _validate_input(x, sr) {
         if (!Array.isArray(x[0])) {
-            x = [x as unknown as number[]];
+            x = [x];
         }
         if (x.length > 2) {
             throw new Error(`Too many dimensions for input audio chunk ${x.length}`);
@@ -63,7 +55,7 @@ class OnnxWrapper {
         return [x, sr];
     }
 
-    resetStates(batch_size: number = 1): void {
+    resetStates(batch_size = 1) {
         console.log(`Resetting states with batch_size: ${batch_size}`);
         this._state = Array(2).fill(0).map(() => Array(batch_size * 128).fill(0));
         this._context = [];
@@ -71,7 +63,7 @@ class OnnxWrapper {
         this._last_batch_size = 0;
     }
 
-    async call(x: number[][], sr: number): Promise<number[][]> {
+    async call(x, sr) {
         console.log(`Calling model with input shape: [${x.length}, ${x[0].length}], sample rate: ${sr}`);
         await this.ready();
         [x, sr] = this._validate_input(x, sr);
@@ -104,21 +96,21 @@ class OnnxWrapper {
             const stateTensor = new ort.Tensor('float32', this._state.flat(), [2, batch_size, 128]);
             const srTensor = new ort.Tensor('int64', [sr], []);
 
-            const feeds: Record<string, ort.Tensor> = {
+            const feeds = {
                 input: inputTensor,
                 state: stateTensor,
                 sr: srTensor
             };
 
             const results = await this.session.run(feeds);
-            const outputData = results.output.data as Float32Array;
-            const stateData = results.stateN.data as Float32Array;
+            const outputData = results.output.data;
+            const stateData = results.stateN.data;
 
             this._state = Array(2).fill(0).map((_, i) => 
                 Array.from(stateData.slice(i * batch_size * 128, (i + 1) * batch_size * 128))
             );
 
-            const outputShape = results.output.dims as number[];
+            const outputShape = results.output.dims;
             const out = Array(outputShape[0]).fill(0).map((_, i) => 
                 Array.from(outputData.slice(i * outputShape[1], (i + 1) * outputShape[1]))
             );
@@ -127,16 +119,17 @@ class OnnxWrapper {
             this._last_sr = sr;
             this._last_batch_size = batch_size;
 
+            
             console.log(`Model call completed, output shape: [${out.length}, ${out[0].length}]`);
             return out;
-        } else {
+            } else {
             throw new Error(`Unsupported sample rate: ${sr}. Supported rates are 8000 and 16000.`);
-        }
+            }
     }
 
-    async audio_forward(x: number[][], sr: number): Promise<number[][]> {
+    async audio_forward(x, sr) {
         console.log(`Running audio_forward with input shape: [${x.length}, ${x[0].length}], sample rate: ${sr}`);
-        const outs: number[][][] = [];
+        const outs = [];
         [x, sr] = this._validate_input(x, sr);
         this.resetStates();
         const num_samples = sr === 16000 ? 512 : 256;
@@ -156,10 +149,10 @@ class OnnxWrapper {
         return outs.reduce((acc, curr) => acc.map((row, i) => [...row, ...curr[i]]));
     }
 
-    close(): void {
+    close() {
         console.log('Closing OnnxWrapper session');
         this.session.release();
     }
 }
 
-export default OnnxWrapper;
+export default OnnxWrapper;                                                                
