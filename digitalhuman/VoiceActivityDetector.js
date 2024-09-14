@@ -1,24 +1,9 @@
-import OnnxWrapper from './Silero'; // Assuming you have this class implemented
-const modelPath = process.env.VAD_MODEL_PATH;
+import OnnxWrapper from './Silero.js';
+
+const modelPath = "silero_vad.onnx";  // Update this path if necessary
 
 export class VadDetector {
-    private model: OnnxWrapper;
-    private startThreshold: number;
-    private endThreshold: number;
-    private samplingRate: number;
-    private minSilenceSamples: number;
-    private speechPadSamples: number;
-    private triggered: boolean;
-    private tempEnd: number;
-    private currentSample: number;
-
-    constructor(
-        startThreshold: number,
-        endThreshold: number,
-        samplingRate: number,
-        minSilenceDurationMs: number,
-        speechPadMs: number
-    ) {
+    constructor(startThreshold, endThreshold, samplingRate, minSilenceDurationMs, speechPadMs) {
         if (samplingRate !== 8000 && samplingRate !== 16000) {
             throw new Error("Does not support sampling rates other than [8000, 16000]");
         }
@@ -33,7 +18,7 @@ export class VadDetector {
         console.log(`VadDetector initialized with: startThreshold=${startThreshold}, endThreshold=${endThreshold}, samplingRate=${samplingRate}`);
     }
 
-    reset(): void {
+    reset() {
         this.model.resetStates();
         this.triggered = false;
         this.tempEnd = 0;
@@ -41,7 +26,7 @@ export class VadDetector {
         console.log('VadDetector reset');
     }
 
-    async apply(data: Float32Array, returnSeconds: boolean): Promise<{ start?: number; end?: number }> {
+    async apply(data, returnSeconds) {
         console.log(`Applying VAD to data of length ${data.length}`);
         const windowSizeSamples = data.length;
         this.currentSample += windowSizeSamples;
@@ -53,7 +38,7 @@ export class VadDetector {
         const numRows = Math.ceil(data.length / rowLength);
 
         // Create the 2D array
-        const x: number[][] = [];
+        const x = [];
         for (let i = 0; i < numRows; i++) {
             const start = i * rowLength;
             const end = Math.min(start + rowLength, data.length);
@@ -65,7 +50,7 @@ export class VadDetector {
             }
         }
 
-        let speechProb: number;
+        let speechProb;
         try {
             let speechProbPromise = await this.model.call(x, this.samplingRate);
             if (speechProbPromise && Array.isArray(speechProbPromise) && speechProbPromise[0]) {
@@ -122,7 +107,7 @@ export class VadDetector {
         return {};
     }
 
-    async close(): Promise<void> {
+    async close() {
         this.reset();
         await this.model.close();
     }
