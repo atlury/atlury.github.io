@@ -1,5 +1,8 @@
 import * as ort from 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/esm/ort.min.js';
 
+// Set the WebAssembly binary file path to jsdelivr CDN
+ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/';
+
 class OnnxWrapper {
     constructor(path, force_onnx_cpu = true) {
         console.log(`Initializing OnnxWrapper with path: ${path}`);
